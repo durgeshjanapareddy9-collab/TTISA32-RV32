@@ -51,7 +51,10 @@ sw/
   build_hex.sh        assemble a .s file into a $readmemh .hex file
 docs/
   ARCHITECTURE.md     design and TTISA-32 semantics
+  VERIFICATION.md     test results with waveform screenshots
   TTISA32_spec.pdf    ISA specification
+  TTISA32_RV32IM_ISA.xlsx  full ISA table: encodings, control signals, test coverage
+verification_screenshots/  GTKWave and console screenshots of every feature
 ```
 
 ## Requirements
@@ -111,3 +114,75 @@ tt_demo      PASS
 
 Save it as `sw/myprog.s` and run `make run T=myprog`. A program stops at `ebreak`.
 The testbench prints PASS when `a0 == 1`. Otherwise it prints the check number held in `gp`.
+
+## How this compares to other ways of going back in time
+
+Rolling back program state is not a new idea. What differs is where it is done
+and what it costs.
+
+| Approach | Who controls it | Cost of one checkpoint | What is rolled back |
+|---|---|---|---|
+| Software save/restore (`sw`/`lw` of every register) | the program | ~31 stores + ~31 loads, plus memory space | whatever the program saves |
+| Reverse debuggers (GDB reverse execution, record/replay tools) | the debugger, not the program | slows the whole run down | full state, but only while debugging |
+| Hardware transactional memory (e.g. Intel TSX) | the program | done by the cache hardware | registers and memory, but only one level: abort back to the start |
+| Checkpoints in out-of-order CPUs (branch misprediction recovery) | the hardware only, invisible to software | in hardware | register mapping |
+| **TTISA-32 (this project)** | **the program, with 5 instructions** | **1 clock cycle** | **registers x1..x31, several named checkpoints** |
+
+The point of TTISA-32 is that saving and restoring the whole register state is a
+normal instruction that the program can use directly, it takes one cycle like
+any other instruction, and there are several checkpoints that can be visited in
+any order (back, forward, or by handle).
+
+### Advantages
+
+- **One cycle for everything.** CHECKPOINT, SNAPSHOT, RESTORE, REWIND and FORWARD all
+  run at CPI = 1. All 31 registers are copied in parallel, so there is no stall and
+  no memory traffic.
+- **Simple to use.** Five instructions with browser-history behaviour: going back and
+  then saving a new checkpoint discards the old "future".
+- **Random access with handles.** SNAPSHOT returns a slot ID that can be kept in a
+  register or memory and passed to RESTORE later.
+- **Fits standard RISC-V.** The instructions use the custom-0 opcode reserved for
+  extensions, so normal RV32IM programs are not affected and the stock GNU assembler
+  can encode them with `.insn` (see `sw/tt.inc`).
+- **Safe on misuse.** An invalid handle, FORWARD at the newest checkpoint or REWIND
+  before any checkpoint is a no-op, and running out of slots sets a sticky
+  `overflow` flag instead of corrupting state.
+- **Easy to change.** The number of slots is a parameter (`TT_SLOTS`).
+- **Tested.** 26 checks in `tt_test.s` cover all instructions and edge cases, plus a
+  module-level testbench for `tt_unit`.
+
+### Disadvantages and limitations
+
+- **Area.** Every slot is a full copy of x1..x31 (992 flip-flops). With 4 slots the
+  checkpoint banks are 3,968 of the core's ~5,030 flip-flops (about 79%), and the TT
+  unit is ~7,100 of ~50,000 generic gates (about 14%). Each extra slot adds another
+  992 flip-flops. (Yosys 0.33 generic synthesis, `synth -flatten`.)
+- **Wide restore path.** A restore selects one of the banks through a 992-bit
+  multiplexer and rewrites all registers at once, which costs wiring and power.
+- **Only registers are rolled back.** The PC is not restored (execution continues
+  after the REWIND), and data memory is not rolled back, so stores done after a
+  checkpoint stay. Software has to handle memory itself.
+- **Fixed number of checkpoints.** With 4 slots, older history cannot be kept; a full
+  timeline drops new saves (the program can check the `-1` handle from SNAPSHOT).
+- **No OS support.** There are no traps, interrupts or CSRs, so an operating system
+  could not yet save the checkpoint banks on a context switch. FENCE, ECALL and
+  EBREAK decode as NOPs.
+- **Single-cycle core.** Simple and easy to verify, but the clock period has to cover
+  the longest path (including the combinational divider), so it would run slowly
+  compared to a pipelined core.
+- **Simulation only.** The design is verified in Icarus Verilog; it has not yet been
+  run on an FPGA or timed for a real clock frequency.
+
+## Use of AI tools
+
+I used an AI assistant (Claude, by Anthropic) during this project to help improve
+the implementation and the documentation. It was used to:
+
+- review the RTL, remove unused logic and add comments
+- set up the GTKWave views and take the verification screenshots
+- generate the ISA spreadsheet (`docs/TTISA32_RV32IM_ISA.xlsx`) from the assembler
+  output and a simulation of the control unit
+- draft parts of the documentation, including this README
+
+Every change was reviewed and checked with the full test suite (`make test`).

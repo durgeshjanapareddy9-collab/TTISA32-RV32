@@ -132,6 +132,7 @@ module rv32_sc_core #(
     );
 
     // ===== ALU =====
+    // Immediate for the ALU's B input; branches and JAL use their own adders
     wire [31:0] imm_selected;
 
     assign imm_selected = (opcode == 7'b0110111) ? imm_u :     // LUI
@@ -139,25 +140,23 @@ module rv32_sc_core #(
                           (opcode == 7'b0100011) ? imm_s :     // SB, SH, SW
                           imm_i;                               // OP-IMM, LOAD, JALR
 
+    // A input: rs1, PC (AUIPC) or zero (LUI)
     wire [31:0] alu_a = (alu_a_src == 2'b00) ? rs1_data :
                         (alu_a_src == 2'b01) ? pc :
                         32'h0;
     wire [31:0] alu_b = alu_b_src ? imm_selected : rs2_data;
 
     wire [31:0] alu_result;
-    wire alu_zero, alu_lt, alu_ltu;
 
     alu alu_stage (
         .a(alu_a),
         .b(alu_b),
         .alu_op(alu_op),
-        .y(alu_result),
-        .zero(alu_zero),
-        .lt(alu_lt),
-        .ltu(alu_ltu)
+        .y(alu_result)
     );
 
     // ===== MUL/DIV (combinational) =====
+    // Always computes from rs1/rs2; the result is only used when m_ext_en=1
     wire [31:0] muldiv_result;
 
     muldiv_comb mdu (
@@ -198,7 +197,6 @@ module rv32_sc_core #(
     lsu lsu_stage (
         .addr(alu_result),
         .write_data(rs2_data),
-        .mem_we(mem_we),
         .mem_re(mem_re),
         .mem_width(mem_width),
         .mem_sign_ext(mem_sign_ext),
@@ -210,7 +208,7 @@ module rv32_sc_core #(
 
     assign dmem_addr        = alu_result;
     assign dmem_wr_data     = store_data;
-    assign dmem_byte_enable = mem_we ? byte_enable : 4'h0;
+    assign dmem_byte_enable = mem_we ? byte_enable : 4'h0;   // no byte lanes unless storing
     assign dmem_we          = mem_we;
     assign dmem_re          = mem_re;
 
@@ -240,6 +238,7 @@ module rv32_sc_core #(
                          branch_target;
 
     // ===== WRITE-BACK MUX =====
+    // Only one of these sources is active for any instruction
     assign wb_data = mem_re     ? load_data     :
                      m_ext_en   ? muldiv_result :
                      reg_wa_src ? pc_plus4      :   // JAL / JALR link

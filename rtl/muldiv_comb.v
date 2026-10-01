@@ -1,6 +1,5 @@
 // Combinational RV32M multiply/divide unit for the single-cycle core.
-// Result is available in the same cycle (the original muldiv.v was multi-cycle and
-// needs a stall, which a single-cycle datapath does not have).
+// The result is ready in the same cycle, so M instructions need no stall.
 //
 // Supported ops (funct3 encoding):
 //   000 MUL, 001 MULH, 010 MULHSU, 011 MULHU

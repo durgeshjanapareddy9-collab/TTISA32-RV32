@@ -1,6 +1,6 @@
-// Control unit for RV32I/RV32M: maps decoded instructions to control signals
-// Key principle: Validate fields by opcode, then select which to use.
-// This avoids the "invalid field" trap mentioned in decoder discussion.
+// Control unit for RV32I/RV32M + TTISA-32: maps opcode/funct3/funct7 to the
+// datapath control signals. Fields are only used when the opcode says they are
+// valid, so e.g. funct7 is ignored for I-type instructions.
 module control_unit(
     input  wire [6:0]  opcode,
     input  wire [2:0]  funct3,
@@ -11,10 +11,10 @@ module control_unit(
     
     // Register write control
     output reg         reg_we,      // register write enable
-    output reg         reg_wa_src,  // 0=rd from instr, 1=PC+4 (for JAL/JALR)
+    output reg         reg_wa_src,  // write-back data: 0=ALU/mem/etc, 1=PC+4 (JAL/JALR)
     
     // ALU operand sources
-    output reg  [1:0]  alu_a_src,   // 00=rs1, 01=PC, 10=0, 11=reserved
+    output reg  [1:0]  alu_a_src,   // 00=rs1, 01=PC, 10=zero
     output reg         alu_b_src,   // 0=rs2 from regfile, 1=immediate
     
     // Memory operations
@@ -24,9 +24,9 @@ module control_unit(
     output reg         mem_sign_ext,// sign extend load (vs zero-extend)
     
     // Branch & jump control
-    output reg         branch_en,   // enable branch (uses ALU.zero flag)
+    output reg         branch_en,   // conditional branch (condition checked in core)
     output reg         jump_en,     // unconditional jump
-    output reg         jalr_en,     // JALR jump (uses computed address, not immediate offset)
+    output reg         jalr_en,     // JALR jump (target = rs1 + imm from the ALU)
     
     // M-extension (multiply/divide)
     output reg         m_ext_en,    // enable M-extension unit
@@ -76,8 +76,8 @@ module control_unit(
             7'b0110111: begin
                 reg_we     = 1'b1;           // write to register
                 alu_a_src  = 2'b10;          // use zero so 0 + imm_u = imm_u
-                alu_b_src  = 1'b1;           // use immediate (but operand doesn't matter for passthrough)
-                alu_op     = ALU_ADD;        // add imm + 0 = imm (effectively a move)
+                alu_b_src  = 1'b1;           // use imm_u
+                alu_op     = ALU_ADD;        // 0 + imm_u
             end
 
             // ===== AUIPC (Add Upper Immediate to PC) =====
@@ -85,7 +85,7 @@ module control_unit(
             // Execution: rd = PC + imm_u
             7'b0010111: begin
                 reg_we     = 1'b1;
-                alu_a_src  = 2'b01;          // use PC (will be provided by fetch unit)
+                alu_a_src  = 2'b01;          // use PC
                 alu_b_src  = 1'b1;           // use immediate
                 alu_op     = ALU_ADD;
             end
@@ -96,8 +96,7 @@ module control_unit(
             7'b1101111: begin
                 reg_we     = 1'b1;
                 reg_wa_src = 1'b1;           // write PC+4 (not ALU result)
-                jump_en    = 1'b1;           // signal fetch unit to use imm_j offset
-                // PC update handled in fetch_unit
+                jump_en    = 1'b1;           // PC = PC + imm_j (target adder in core)
             end
 
             // ===== JALR (Jump And Link Register) =====
@@ -107,7 +106,7 @@ module control_unit(
                 if (funct3 == 3'b000) begin
                     reg_we     = 1'b1;
                     reg_wa_src = 1'b1;       // write PC+4
-                    jalr_en    = 1'b1;       // signal fetch to compute rs1+imm address
+                    jalr_en    = 1'b1;       // PC = (rs1 + imm_i) & ~1
                     alu_a_src  = 2'b00;      // use rs1
                     alu_b_src  = 1'b1;       // use imm_i
                     alu_op     = ALU_ADD;    // compute address: rs1 + imm_i
@@ -117,20 +116,10 @@ module control_unit(
             // ===== BRANCH (BEQ, BNE, BLT, BGE, BLTU, BGEU) =====
             // Valid fields: opcode, rs1, rs2, funct3, imm_b
             // Execution: if (condition) PC = PC + imm_b; else PC = PC + 4
+            // The core compares rs1/rs2 itself (funct3 picks the condition) and
+            // has its own target adder, so the ALU is not used here.
             7'b1100011: begin
-                branch_en  = 1'b1;           // enable branch logic
-                alu_a_src  = 2'b00;          // use rs1
-                alu_b_src  = 1'b0;           // use rs2
-                // funct3 selects the condition in fetch unit
-                // ALU computes comparison result
-                case(funct3)
-                    3'b000: alu_op = ALU_SUB; // BEQ: a == b → (a - b) == 0 → zero flag
-                    3'b001: alu_op = ALU_SUB; // BNE: a != b → (a - b) != 0 → !zero flag
-                    3'b100: alu_op = ALU_SLT; // BLT: a < b (signed)
-                    3'b101: alu_op = ALU_SLT; // BGE: a >= b (signed, invert condition)
-                    3'b110: alu_op = ALU_SLTU;// BLTU: a < b (unsigned)
-                    3'b111: alu_op = ALU_SLTU;// BGEU: a >= b (unsigned, invert condition)
-                endcase
+                branch_en  = 1'b1;
             end
 
             // ===== LOAD (LW, LH, LB, LHU, LBU) =====

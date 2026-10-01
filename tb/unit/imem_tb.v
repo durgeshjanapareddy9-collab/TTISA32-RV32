@@ -2,26 +2,15 @@
 
 module imem_tb;
 
-    reg  clk;
     reg  [31:0] addr;
     wire [31:0] instr;
-    reg  [31:0] addr_sync;
-    wire [31:0] instr_sync;
 
     localparam NOP = 32'h00000013;
 
     // Instantiate instruction memory
     imem #(.DEPTH(8)) dut (
-        .clk(clk),
         .addr(addr),
         .instr(instr)
-    );
-    
-    // Synchronous variant (BRAM-friendly)
-    imem #(.DEPTH(8), .SYNC_READ(1)) dut_sync (
-        .clk(clk),
-        .addr(addr_sync),
-        .instr(instr_sync)
     );
 
     integer test_num = 0;
@@ -41,33 +30,14 @@ module imem_tb;
         end
     endtask
 
-    task sync_read_check(input [31:0] raddr, input [31:0] expected, input string msg);
-        begin
-            @(negedge clk);
-            addr_sync = raddr;
-            @(posedge clk);
-            #1;
-            assert_equal(instr_sync, expected, msg);
-        end
-    endtask
-
-    // Clock generation
-    always begin
-        clk = 1'b0;
-        #5;
-        clk = 1'b1;
-        #5;
-    end
-
     initial begin
         $display("\n╔════════════════════════════════════════════════════════════════╗");
         $display("║            INSTRUCTION MEMORY (IMEM) TESTBENCH                 ║");
-        $display("║         Testing Async + Sync ROM Read                          ║");
+        $display("║         Testing combinational ROM read                         ║");
         $display("╚════════════════════════════════════════════════════════════════╝\n");
 
         // Default to NOPs
         addr = 32'h00000000;
-        addr_sync = 32'h00000000;
         #1;
         assert_equal(instr, NOP, "Default memory initialized to NOP");
 
@@ -75,9 +45,6 @@ module imem_tb;
         dut.mem[0] = 32'hDEADBEEF;
         dut.mem[1] = 32'hCAFEBABE;
         dut.mem[3] = 32'h12345678;
-        dut_sync.mem[0] = 32'hDEADBEEF;
-        dut_sync.mem[1] = 32'hCAFEBABE;
-        dut_sync.mem[3] = 32'h12345678;
         #1;
 
         // Read word 0
@@ -104,13 +71,6 @@ module imem_tb;
         addr = 32'h0000000C;
         #1;
         assert_equal(instr, 32'h12345678, "Read word 3");
-
-        // ===== SYNC READ TESTS =====
-        $display("\n[SYNC] Testing registered read latency");
-        sync_read_check(32'h00000000, 32'hDEADBEEF, "Sync read word 0");
-        sync_read_check(32'h00000004, 32'hCAFEBABE, "Sync read word 1");
-        sync_read_check(32'h00000008, NOP,         "Sync read default NOP (word 2)");
-        sync_read_check(32'h0000000C, 32'h12345678, "Sync read word 3");
 
         // ===== SUMMARY =====
         $display("\n╔════════════════════════════════════════════════════════════════╗");

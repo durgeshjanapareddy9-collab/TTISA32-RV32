@@ -147,20 +147,19 @@ module tb;
         check1("SW reg_we",    reg_we,    1'b0);
 
         // ===== Test 13: BEQ (B-type Branch, funct3=000) =====
-        // Expected: branch_en=1, alu_a_src=2'b00 (rs1), alu_b_src=0 (rs2), alu_op=SUB
+        // Expected: branch_en=1, no register or memory write
         opcode = 7'b1100011; funct3 = 3'b000; funct7 = 7'b0000000;
         #1;
         check1("BEQ branch_en",   branch_en,   1'b1);
-        check1("BEQ alu_a_src",   alu_a_src,   2'b00);
-        check1("BEQ alu_b_src",   alu_b_src,   1'b0);
-        check1("BEQ alu_op",      alu_op,      4'd1); // SUB (to check zero flag)
+        check1("BEQ reg_we",      reg_we,      1'b0);
+        check1("BEQ mem_we",      mem_we,      1'b0);
 
         // ===== Test 14: BLT (B-type Branch, funct3=100) =====
-        // Expected: branch_en=1, alu_op=SLT
+        // Expected: branch_en=1, no register write
         opcode = 7'b1100011; funct3 = 3'b100; funct7 = 7'b0000000;
         #1;
         check1("BLT branch_en", branch_en, 1'b1);
-        check1("BLT alu_op",    alu_op,    4'd8); // SLT
+        check1("BLT reg_we",    reg_we,    1'b0);
 
         // ===== Test 15: JAL (J-type Jump, all funct fields ignored) =====
         // Expected: reg_we=1, reg_wa_src=1 (PC+4), jump_en=1

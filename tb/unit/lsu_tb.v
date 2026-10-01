@@ -6,7 +6,6 @@
 module lsu_tb ();
     reg  [31:0] addr;
     reg  [31:0] write_data;
-    reg         mem_we;
     reg         mem_re;
     reg  [2:0]  mem_width;
     reg         mem_sign_ext;
@@ -19,7 +18,6 @@ module lsu_tb ();
     lsu uut (
         .addr(addr),
         .write_data(write_data),
-        .mem_we(mem_we),
         .mem_re(mem_re),
         .mem_width(mem_width),
         .mem_sign_ext(mem_sign_ext),
@@ -35,7 +33,6 @@ module lsu_tb ();
         // Initialize signals
         addr = 32'b0;
         write_data = 32'b0;
-        mem_we = 1'b0;
         mem_re = 1'b0;
         mem_width = 3'b0;
         mem_sign_ext = 1'b0;
@@ -45,7 +42,6 @@ module lsu_tb ();
         $display("TEST 1: Byte Write at address 0x0");
         addr = 32'h0000_0000;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b000;  // byte
         #1;
         if (byte_enable !== 4'b0001) $error("Expected byte_enable=0001, got %04b", byte_enable);
@@ -56,7 +52,6 @@ module lsu_tb ();
         $display("TEST 2: Byte Write at address 0x1");
         addr = 32'h0000_0001;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b000;
         #1;
         if (byte_enable !== 4'b0010) $error("Expected byte_enable=0010, got %04b", byte_enable);
@@ -67,7 +62,6 @@ module lsu_tb ();
         $display("TEST 3: Byte Write at address 0x2");
         addr = 32'h0000_0002;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b000;
         #1;
         if (byte_enable !== 4'b0100) $error("Expected byte_enable=0100, got %04b", byte_enable);
@@ -78,7 +72,6 @@ module lsu_tb ();
         $display("TEST 4: Byte Write at address 0x3");
         addr = 32'h0000_0003;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b000;
         #1;
         if (byte_enable !== 4'b1000) $error("Expected byte_enable=1000, got %04b", byte_enable);
@@ -89,7 +82,6 @@ module lsu_tb ();
         $display("TEST 5: Half-Word Write at address 0x0");
         addr = 32'h0000_0000;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b001;  // half-word
         #1;
         if (byte_enable !== 4'b0011) $error("Expected byte_enable=0011, got %04b", byte_enable);
@@ -100,7 +92,6 @@ module lsu_tb ();
         $display("TEST 6: Half-Word Write at address 0x2");
         addr = 32'h0000_0002;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b001;
         #1;
         if (byte_enable !== 4'b1100) $error("Expected byte_enable=1100, got %04b", byte_enable);
@@ -111,7 +102,6 @@ module lsu_tb ();
         $display("TEST 7: Word Write at address 0x0");
         addr = 32'h0000_0000;
         write_data = 32'hDEAD_BEEF;
-        mem_we = 1'b1;
         mem_width = 3'b010;  // word
         #1;
         if (byte_enable !== 4'b1111) $error("Expected byte_enable=1111, got %04b", byte_enable);
@@ -253,7 +243,6 @@ module lsu_tb ();
         $display("TEST 20: Half-Word Write at offset 0 (lower half)");
         addr = 32'h0000_0000;
         write_data = 32'h1234_5678;  // write 0x5678
-        mem_we = 1'b1;
         mem_width = 3'b001;
         #1;
         if (byte_enable !== 4'b0011) $error("Expected byte_enable=0011, got %04b", byte_enable);

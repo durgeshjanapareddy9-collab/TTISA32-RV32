@@ -1,6 +1,5 @@
 // 32x32 register file for the single-cycle core, with TTISA-32 support.
 //
-// Differences from the original rv32im_core register file:
 // - No write-through bypass. In a single-cycle datapath the write data is
 //   computed from the read data in the same cycle, so a bypass would form a
 //   combinational loop (e.g. ADD x1, x1, x2).

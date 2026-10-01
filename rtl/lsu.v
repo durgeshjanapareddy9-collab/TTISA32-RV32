@@ -5,7 +5,6 @@
 module lsu (
     input  [31:0] addr,           // memory address (from ALU: rs1 + imm)
     input  [31:0] write_data,     // data to write (from rs2)
-    input         mem_we,         // memory write enable (from control)
     input         mem_re,         // memory read enable (from control)
     input  [2:0]  mem_width,      // 000=byte, 001=half, 010=word (from control)
     input         mem_sign_ext,   // sign-extend load? (from control)
@@ -20,6 +19,7 @@ module lsu (
     wire [1:0] byte_offset = addr[1:0];
     
     // Byte enable generation based on mem_width and alignment
+    // (the core forces it to 0000 when the instruction is not a store)
     assign byte_enable = get_byte_enable(mem_width, byte_offset);
     
     function [3:0] get_byte_enable(input [2:0] width, input [1:0] offset);

@@ -13,6 +13,8 @@ module decoder(
     output wire [31:0] imm_u,
     output wire [31:0] imm_j
 );
+    // Fixed field positions in every RISC-V format; the control unit decides
+    // which of them are meaningful for the current opcode.
     assign opcode = instr[6:0];
     assign rd     = instr[11:7];
     assign funct3 = instr[14:12];
@@ -20,7 +22,7 @@ module decoder(
     assign rs2    = instr[24:20];
     assign funct7 = instr[31:25];
 
-    // Reuse the immediate generator so all formats stay consistent.
+    // All five immediate formats are built in parallel; the core picks one.
     imm_gen ig(
         .instr(instr),
         .imm_i(imm_i),

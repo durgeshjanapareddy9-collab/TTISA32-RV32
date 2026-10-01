@@ -1,4 +1,6 @@
 # RV32I self-checking test for the single-cycle core
+# Each CHECK compares a register with the expected value; on a mismatch the
+# program jumps to fail with the check number in gp (see test_macros.inc).
 .include "test_macros.inc"
 
 .text

@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+// Data memory (RAM) with byte-enable writes.
+// The single-cycle core uses SYNC_READ=0 so loads finish in the same cycle.
 module dmem #(
     parameter DEPTH = 256,  // 256 words = 1KB
     parameter SYNC_READ = 1 // 1=registered read, 0=combinational read (single-cycle)
@@ -20,7 +22,6 @@ module dmem #(
     output [31:0] debug_data
 );
     
-    // Memory array (1KB = 256 words)
     reg [31:0] mem [0:DEPTH-1];
     integer i;
     
@@ -36,11 +37,9 @@ module dmem #(
     
     // ===== WRITE LOGIC (Synchronous) =====
     // Only write bytes that are enabled (byte_enable controls which bytes)
+    // Memory contents are not cleared by reset, only by the initial block
     always @(posedge clk) begin
-        if (rst) begin
-            // No reset for memory contents (keep data across reset)
-            // Only reset happens after explicit initialization
-        end else if (mem_we) begin
+        if (!rst && mem_we) begin
             if (byte_enable[0])
                 mem[word_addr][7:0] <= wr_data[7:0];
             if (byte_enable[1])
@@ -74,9 +73,5 @@ module dmem #(
     // ===== DEBUG PORT (Combinational Read) =====
     // Allows immediate inspection without affecting main datapath
     assign debug_data = mem[debug_word_addr];
-    
-    // ===== INITIALIZATION =====
-    // Optional: Load program data at power-up
-    // Use $readmemh or initialize manually for testing
-    
+
 endmodule

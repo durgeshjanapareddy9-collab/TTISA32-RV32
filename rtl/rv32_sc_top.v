@@ -10,6 +10,7 @@ module rv32_sc_top #(
     input clk,
     input rst_n
 );
+    // Core <-> memory buses
     wire [31:0] imem_addr, imem_instr;
     wire [31:0] dmem_addr, dmem_wr_data, dmem_rd_data;
     wire [3:0]  dmem_byte_enable;
@@ -29,7 +30,6 @@ module rv32_sc_top #(
     );
 
     imem #(.DEPTH(IMEM_DEPTH), .MEM_FILE(IMEM_FILE)) imem_inst (
-        .clk(clk),
         .addr(imem_addr),
         .instr(imem_instr)
     );
@@ -43,7 +43,7 @@ module rv32_sc_top #(
         .mem_we(dmem_we),
         .mem_re(dmem_re),
         .rd_data(dmem_rd_data),
-        .debug_addr(32'h0),
+        .debug_addr(32'h0),             // debug port is only used by dmem_tb
         .debug_data()
     );
 
